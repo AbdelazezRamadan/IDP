@@ -3,18 +3,27 @@ using Microsoft.EntityFrameworkCore;
 using IDP.Data;
 using IdentityServer4.Models;
 using IDP;
+using DemoIDP;
+using Microsoft.Extensions.Hosting;
+using AutoMapper;
 
 var builder = WebApplication.CreateBuilder(args);
+var usersConnection = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var identityConnection = builder.Configuration.GetConnectionString("IdentityConnection") ?? throw new InvalidOperationException("Connection string 'IdentityConnection' not found.");
 
+var migrationAssembly = typeof(Program).Assembly.GetName().Name;
 // Add services to the container.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
+    options.UseSqlServer(usersConnection,
+            sql => sql.MigrationsAssembly(migrationAssembly)));
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
+builder.Services.AddIdentity<IdentityUser , IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>();
-builder.Services.AddControllersWithViews();
+
+
+
 
 //builder.Services.AddIdentityServer()
 //    .AddInMemoryClients(new List<Client>())
@@ -25,13 +34,23 @@ builder.Services.AddControllersWithViews();
 //    .AddDeveloperSigningCredential();
 
 builder.Services.AddIdentityServer()
-    .AddInMemoryClients(clients: Config.Clients)
-    .AddInMemoryIdentityResources(Config.IdentityResources)
-    .AddInMemoryApiResources(Config.ApiResources)
-    .AddInMemoryApiScopes(Config.ApiScopes)
-    .AddTestUsers(Config.Users)
+    .AddAspNetIdentity<IdentityUser>()
+    .AddConfigurationStore(option =>
+    {
+        option.ConfigureDbContext = builder=>builder.UseSqlServer(identityConnection,
+            sql=>sql.MigrationsAssembly(migrationAssembly));
+    })
+    .AddOperationalStore(option =>
+    {
+        option.ConfigureDbContext = builder=> builder.UseSqlServer(identityConnection,
+            sql => sql.MigrationsAssembly(migrationAssembly));
+    })
     .AddDeveloperSigningCredential();
+builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages();
 
+//Mapper
+builder.Services.AddAutoMapper(typeof(IdentityMapperProfile));
 
 var app = builder.Build();
 
@@ -46,7 +65,23 @@ else
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var mapper = services.GetRequiredService<IMapper>();
+    try
+    {
 
+
+        SeedData.EnsureSeedData(usersConnection, identityConnection, mapper);
+    }
+    catch (Exception ex)
+    {
+        // Log any exceptions that occur during data seeding
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
@@ -60,3 +95,4 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 app.Run();
+

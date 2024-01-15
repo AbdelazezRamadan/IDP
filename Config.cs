@@ -107,7 +107,7 @@ namespace IDP
 
         public static IEnumerable<ApiScope> ApiScopes => new[]
         {
-            new ApiScope("weatherapi.read","read"),
+            new ApiScope("api.read","read"),
             new ApiScope("weatherapi.write","write",new[]{ "role"}),
         };
 
@@ -115,7 +115,7 @@ namespace IDP
         {
           new ApiResource("weatherapi")
           {
-            Scopes = new List<string> {"weatherapi.read", "weatherapi.write"},
+            Scopes = new List<string> {"api.read", "weatherapi.write"},
             ApiSecrets = new List<Secret> {new Secret("ScopeSecret".Sha256())},
             UserClaims = new List<string> {"role"}
           }
@@ -123,26 +123,19 @@ namespace IDP
 
         public static IEnumerable<Client> Clients => new[]
           {
-            // m2m client credentials flow client
             new Client
             {
-              ClientId = "m2m.client",
-              ClientName = "Client Credentials Client",
+              ClientId = "Plus",
+              ClientName = "Plus",
 
-              AllowedGrantTypes = GrantTypes.ClientCredentials,
+              AllowedGrantTypes = GrantTypes.ClientCredentials    ,
               ClientSecrets = {new Secret("secret".Sha256())},
-              //ClientSecrets = {new Secret(){
-              //    Type = IdentityServerConstants.SecretTypes.JsonWebKey,
-              //    Value = ""
-              //} },
-
-              AllowedScopes = { "weatherapi.read", "weatherapi.write"}
+              AllowedScopes = { "api.read", "weatherapi.write"}
             },
 
-            // interactive client using code flow + pkce
             new Client
             {
-              ClientId = "interactive",
+              ClientId = "Extra-Teacher",
               ClientSecrets = {new Secret("secret".Sha256())},
 
               AllowedGrantTypes = GrantTypes.Code,
@@ -152,7 +145,7 @@ namespace IDP
               PostLogoutRedirectUris = {"https://localhost:5444/signout-callback-oidc"},
 
               AllowOfflineAccess = true,
-              AllowedScopes = {"openid", "profile", "weatherapi.read"},
+              AllowedScopes = {"openid", "profile", "api.read"},
               RequirePkce = true,
               RequireConsent = true,
               AllowPlainTextPkce = false
